@@ -7,6 +7,7 @@
 import { Options, MAX_ITERATIONS, MIN_QUALITY } from './types';
 import { canvasToBlob } from './utils';
 import { drawImageToCanvas, scaleCanvas } from './resize';
+import { applyWatermark } from './watermark';
 
 /**
  * Compress a canvas to a Blob at a given quality level.
@@ -25,6 +26,7 @@ export async function compressCanvasToBlob(
  *
  * Strategy:
  * 1. Draw image to canvas (with optional resize via maxWidthOrHeight)
+ * 1b. Apply watermark if configured
  * 2. Binary search quality 1.0 → MIN_QUALITY
  * 3. If still too large after quality floor, scale down dimensions and retry
  * 4. Reports progress via onProgress callback throughout
@@ -40,6 +42,7 @@ export async function smartCompress(
         fileType,
         exifOrientation = true,
         onProgress,
+        watermark,
     } = options;
 
     // Helper to safely report progress
@@ -56,6 +59,11 @@ export async function smartCompress(
 
     // Step 1: Draw to canvas (resize if maxWidthOrHeight set, fix EXIF orientation)
     let { canvas } = await drawImageToCanvas(file, maxWidthOrHeight, exifOrientation);
+
+    // Step 1b: Apply watermark if configured
+    if (watermark) {
+        await applyWatermark(canvas, watermark);
+    }
 
     report(20);
 

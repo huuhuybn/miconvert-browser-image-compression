@@ -3,6 +3,8 @@
  * Configuration options and type definitions
  */
 
+import { WatermarkOptions } from './watermark';
+
 export interface Options {
     /** Target maximum file size in MB (e.g. 0.5 = 500KB) */
     maxSizeMB?: number;
@@ -27,6 +29,9 @@ export interface Options {
 
     /** Whether to auto-fix EXIF orientation (iPhone rotation fix). Default: true */
     exifOrientation?: boolean;
+
+    /** Watermark configuration. Disabled by default. */
+    watermark?: WatermarkOptions;
 }
 
 /** Maximum number of binary search iterations for smart compress */
