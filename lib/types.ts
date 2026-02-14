@@ -16,10 +16,10 @@ export interface Options {
     /** Output MIME type (e.g. 'image/webp', 'image/jpeg'). Default: same as input */
     fileType?: string;
 
-    /** Run compression in a Web Worker. Default: true (Phase 3) */
+    /** Run compression in a Web Worker. Default: true */
     useWebWorker?: boolean;
 
-    /** Progress callback. Receives percentage 0–100. (Phase 3) */
+    /** Progress callback. Receives percentage 0–100. */
     onProgress?: (progress: number) => void;
 
     /** Output type: 'file' returns File/Blob, 'base64' returns Data URL string. Default: 'file' */

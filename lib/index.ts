@@ -10,6 +10,7 @@
 import { Options, SUPPORTED_TYPES, MAX_FILE_SIZE } from './types';
 import { smartCompress } from './compress';
 import { blobToFile, blobToBase64, getOutputFileName, fileSizeMB } from './utils';
+import { isWorkerSupported, compressInWorker, terminateWorker } from './worker';
 
 /**
  * Custom error class with miconvert branding.
@@ -54,6 +55,7 @@ function validateInput(file: File): void {
  * Compress an image file in the browser.
  *
  * Returns a File by default, or a base64 Data URL string if `outputType: 'base64'`.
+ * Uses Web Worker when `useWebWorker: true` (default) and browser supports it.
  *
  * @param file - The input image File object
  * @param options - Compression options
@@ -63,15 +65,24 @@ function validateInput(file: File): void {
  * ```ts
  * import imageCompression from '@miconvert/browser-image-compression';
  *
- * // Get compressed File (default)
+ * // Simple usage
  * const compressed = await imageCompression(file, { maxSizeMB: 1 });
+ *
+ * // With progress callback and Web Worker
+ * const compressed = await imageCompression(file, {
+ *   maxSizeMB: 0.5,
+ *   maxWidthOrHeight: 1920,
+ *   useWebWorker: true,
+ *   fileType: 'image/webp',
+ *   onProgress: (p) => console.log(`${p}%`),
+ * });
  *
  * // Get base64 for preview
  * const base64 = await imageCompression(file, {
  *   maxSizeMB: 0.5,
  *   outputType: 'base64',
  * });
- * img.src = base64; // Data URL ready to use
+ * img.src = base64;
  * ```
  */
 async function imageCompression(
@@ -88,8 +99,24 @@ async function imageCompression(
 ): Promise<File | string> {
     validateInput(file);
 
+    // Default useWebWorker to true
+    const useWorker = options.useWebWorker !== false;
+
     try {
-        const blob = await smartCompress(file, options);
+        let blob: Blob;
+
+        // Try Web Worker path if enabled and supported
+        if (useWorker && isWorkerSupported()) {
+            try {
+                blob = await compressInWorker(file, options);
+            } catch {
+                // Worker failed — fallback to main thread silently
+                blob = await smartCompress(file, options);
+            }
+        } else {
+            // Main thread compression
+            blob = await smartCompress(file, options);
+        }
 
         // Base64 output
         if (options.outputType === 'base64') {
@@ -112,7 +139,7 @@ async function imageCompression(
 }
 
 // Named exports for advanced usage
-export { imageCompression, Options };
+export { imageCompression, terminateWorker, Options };
 export { getExifOrientation, applyExifOrientation } from './exif';
 
 // Default export for simple usage
