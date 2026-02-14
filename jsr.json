@@ -1,0 +1,6 @@
+{
+    "name": "@miconvert/browser-image-compression",
+    "version": "1.2.0",
+    "description": "Smart browser-side image compression with target file size, auto-resize, WebP conversion, EXIF orientation fix, and watermark support.",
+    "exports": "./lib/index.ts"
+}
