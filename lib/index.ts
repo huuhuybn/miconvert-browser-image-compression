@@ -52,6 +52,25 @@ function validateInput(file: File): void {
 }
 
 /**
+ * BUG-10: Create a monotonic progress wrapper.
+ * Ensures progress only increases, never decreases
+ * (prevents confusing UX when Worker fails and falls back to main thread).
+ */
+function createMonotonicProgress(
+    onProgress?: (progress: number) => void
+): ((progress: number) => void) | undefined {
+    if (!onProgress) return undefined;
+
+    let lastProgress = 0;
+    return (progress: number) => {
+        if (progress > lastProgress) {
+            lastProgress = progress;
+            onProgress(progress);
+        }
+    };
+}
+
+/**
  * Compress an image file in the browser.
  *
  * Returns a File by default, or a base64 Data URL string if `outputType: 'base64'`.
@@ -83,6 +102,14 @@ function validateInput(file: File): void {
  *   outputType: 'base64',
  * });
  * img.src = base64;
+ *
+ * // With abort support
+ * const controller = new AbortController();
+ * const compressed = await imageCompression(file, {
+ *   maxSizeMB: 1,
+ *   signal: controller.signal,
+ * });
+ * // To cancel: controller.abort();
  * ```
  */
 async function imageCompression(
@@ -102,20 +129,30 @@ async function imageCompression(
     // Default useWebWorker to true
     const useWorker = options.useWebWorker !== false;
 
+    // BUG-10: Wrap progress callback to ensure monotonic progress
+    const wrappedOptions: Options = {
+        ...options,
+        onProgress: createMonotonicProgress(options.onProgress),
+    };
+
     try {
         let blob: Blob;
 
         // Try Web Worker path if enabled and supported
         if (useWorker && isWorkerSupported()) {
             try {
-                blob = await compressInWorker(file, options);
-            } catch {
+                blob = await compressInWorker(file, wrappedOptions);
+            } catch (error) {
+                // BUG-07: Don't fallback if user explicitly aborted
+                if (error instanceof DOMException && error.name === 'AbortError') {
+                    throw error;
+                }
                 // Worker failed — fallback to main thread silently
-                blob = await smartCompress(file, options);
+                blob = await smartCompress(file, wrappedOptions);
             }
         } else {
             // Main thread compression
-            blob = await smartCompress(file, options);
+            blob = await smartCompress(file, wrappedOptions);
         }
 
         // Base64 output
@@ -127,6 +164,11 @@ async function imageCompression(
         const outputName = getOutputFileName(file.name, options.fileType);
         return blobToFile(blob, outputName);
     } catch (error) {
+        // BUG-07: Re-throw AbortError as-is
+        if (error instanceof DOMException && error.name === 'AbortError') {
+            throw error;
+        }
+
         if (error instanceof MiconvertCompressionError) {
             throw error;
         }

@@ -159,8 +159,36 @@ function loadImage(url: string): Promise<HTMLImageElement> {
     return new Promise((resolve, reject) => {
         const img = new Image();
         img.crossOrigin = 'anonymous';
-        img.onload = () => resolve(img);
-        img.onerror = () => reject(new Error(`Failed to load watermark image: ${url}`));
+        let settled = false;
+
+        // BUG-11: 15s timeout for watermark image
+        const timer = setTimeout(() => {
+            if (!settled) {
+                settled = true;
+                reject(new Error(
+                    `Watermark image load timed out (15s): ${url}. ` +
+                    `Check that the URL is accessible and CORS-enabled.`
+                ));
+            }
+        }, 15_000);
+
+        img.onload = () => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            resolve(img);
+        };
+        img.onerror = () => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            reject(new Error(
+                `Failed to load watermark image: ${url}. ` +
+                `This is often caused by CORS restrictions. ` +
+                `Ensure the image server sends Access-Control-Allow-Origin headers, ` +
+                `or use a same-origin URL or data URL.`
+            ));
+        };
         img.src = url;
     });
 }

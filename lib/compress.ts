@@ -4,8 +4,8 @@
  * with progress callback support
  */
 
-import { Options, MAX_ITERATIONS, MIN_QUALITY } from './types';
-import { canvasToBlob } from './utils';
+import { Options, MAX_ITERATIONS, MIN_QUALITY, LOSSLESS_TYPES } from './types';
+import { canvasToBlob, releaseCanvas } from './utils';
 import { drawImageToCanvas, scaleCanvas } from './resize';
 import { applyWatermark } from './watermark';
 
@@ -21,6 +21,15 @@ export async function compressCanvasToBlob(
 }
 
 /**
+ * BUG-07: Check if an AbortSignal has been aborted, throw if so.
+ */
+function checkAborted(signal?: AbortSignal): void {
+    if (signal?.aborted) {
+        throw new DOMException('Compression aborted by user.', 'AbortError');
+    }
+}
+
+/**
  * Smart compress: uses binary search to find the highest quality
  * that produces output ≤ maxSizeMB.
  *
@@ -28,8 +37,10 @@ export async function compressCanvasToBlob(
  * 1. Draw image to canvas (with optional resize via maxWidthOrHeight)
  * 1b. Apply watermark if configured
  * 2. Binary search quality 1.0 → MIN_QUALITY
+ *    - BUG-05: Skip binary search for lossless formats (PNG/BMP/GIF)
  * 3. If still too large after quality floor, scale down dimensions and retry
  * 4. Reports progress via onProgress callback throughout
+ * 5. BUG-07: Checks AbortSignal before each expensive step
  */
 export async function smartCompress(
     file: Blob,
@@ -43,6 +54,7 @@ export async function smartCompress(
         exifOrientation = true,
         onProgress,
         watermark,
+        signal,
     } = options;
 
     // Helper to safely report progress
@@ -55,16 +67,22 @@ export async function smartCompress(
     // Determine output MIME type
     const outputType = fileType || file.type || 'image/jpeg';
 
+    // BUG-05: Check if output is a lossless format (quality param is ignored by canvas)
+    const isLossless = LOSSLESS_TYPES.includes(outputType);
+
+    checkAborted(signal);
     report(5);
 
     // Step 1: Draw to canvas (resize if maxWidthOrHeight set, fix EXIF orientation)
-    let { canvas } = await drawImageToCanvas(file, maxWidthOrHeight, exifOrientation);
+    // Pass outputType so drawImageToCanvas can fill white background if needed (BUG-01)
+    let { canvas } = await drawImageToCanvas(file, maxWidthOrHeight, exifOrientation, outputType);
 
     // Step 1b: Apply watermark if configured
     if (watermark) {
         await applyWatermark(canvas, watermark);
     }
 
+    checkAborted(signal);
     report(20);
 
     // If no maxSizeMB constraint, just compress at initialQuality
@@ -86,67 +104,84 @@ export async function smartCompress(
         return blob;
     }
 
-    // Step 2: Binary search for optimal quality
-    let low = MIN_QUALITY;
-    let high = initialQuality;
-    let bestBlob = blob;
+    // BUG-05: For lossless formats, skip quality binary search entirely
+    // (quality parameter has no effect on PNG/BMP/GIF).
+    // Jump straight to dimension downscaling.
+    if (!isLossless) {
+        // Step 2: Binary search for optimal quality
+        let low = MIN_QUALITY;
+        let high = initialQuality;
+        let bestBlob = blob;
 
-    for (let i = 0; i < MAX_ITERATIONS; i++) {
-        const mid = (low + high) / 2;
-        blob = await compressCanvasToBlob(canvas, outputType, mid);
+        for (let i = 0; i < MAX_ITERATIONS; i++) {
+            checkAborted(signal);
 
-        if (blob.size <= targetBytes) {
-            // Quality is acceptable, try to find higher quality
-            bestBlob = blob;
-            low = mid;
-        } else {
-            // Still too large, reduce quality
-            high = mid;
+            const mid = (low + high) / 2;
+            blob = await compressCanvasToBlob(canvas, outputType, mid);
+
+            if (blob.size <= targetBytes) {
+                // Quality is acceptable, try to find higher quality
+                bestBlob = blob;
+                low = mid;
+            } else {
+                // Still too large, reduce quality
+                high = mid;
+            }
+
+            // Progress: 30% to 70% during binary search
+            report(30 + ((i + 1) / MAX_ITERATIONS) * 40);
+
+            // If we're close enough (within 10% of target), stop early
+            if (
+                blob.size <= targetBytes &&
+                blob.size >= targetBytes * 0.9
+            ) {
+                report(100);
+                return blob;
+            }
         }
 
-        // Progress: 30% to 70% during binary search
-        report(30 + ((i + 1) / MAX_ITERATIONS) * 40);
-
-        // If we're close enough (within 10% of target), stop early
-        if (
-            blob.size <= targetBytes &&
-            blob.size >= targetBytes * 0.9
-        ) {
+        // If binary search on quality succeeded
+        if (bestBlob.size <= targetBytes) {
             report(100);
-            return blob;
+            return bestBlob;
         }
     }
 
-    // If binary search on quality succeeded
-    if (bestBlob.size <= targetBytes) {
-        report(100);
-        return bestBlob;
-    }
-
+    checkAborted(signal);
     report(75);
 
     // Step 3: Fallback — progressive dimension downscale
-    // If quality reduction alone isn't enough, reduce dimensions
+    // If quality reduction alone isn't enough (or lossless), reduce dimensions
+    let bestBlob = blob;
     let scale = 0.9;
     for (let i = 0; i < MAX_ITERATIONS; i++) {
+        checkAborted(signal);
+
+        // BUG-12: scaleCanvas now releases the old canvas internally
         canvas = scaleCanvas(canvas, scale);
-        blob = await compressCanvasToBlob(canvas, outputType, MIN_QUALITY);
+        blob = await compressCanvasToBlob(canvas, outputType, isLossless ? 1.0 : MIN_QUALITY);
 
         if (blob.size <= targetBytes) {
-            // Found a size that works, now binary search quality at this dimension
-            low = MIN_QUALITY;
-            high = initialQuality;
+            if (!isLossless) {
+                // Found a size that works, now binary search quality at this dimension
+                let low = MIN_QUALITY;
+                let high = initialQuality;
 
-            for (let j = 0; j < MAX_ITERATIONS; j++) {
-                const mid = (low + high) / 2;
-                const tryBlob = await compressCanvasToBlob(canvas, outputType, mid);
+                for (let j = 0; j < MAX_ITERATIONS; j++) {
+                    checkAborted(signal);
+                    const mid = (low + high) / 2;
+                    const tryBlob = await compressCanvasToBlob(canvas, outputType, mid);
 
-                if (tryBlob.size <= targetBytes) {
-                    bestBlob = tryBlob;
-                    low = mid;
-                } else {
-                    high = mid;
+                    if (tryBlob.size <= targetBytes) {
+                        bestBlob = tryBlob;
+                        low = mid;
+                    } else {
+                        high = mid;
+                    }
                 }
+            } else {
+                bestBlob = blob;
             }
 
             report(100);

@@ -32,6 +32,9 @@ export interface Options {
 
     /** Watermark configuration. Disabled by default. */
     watermark?: WatermarkOptions;
+
+    /** AbortSignal to cancel compression. */
+    signal?: AbortSignal;
 }
 
 /** Maximum number of binary search iterations for smart compress */
@@ -43,6 +46,12 @@ export const MIN_QUALITY = 0.05;
 /** Maximum file size the library will attempt to process (100MB) */
 export const MAX_FILE_SIZE = 100 * 1024 * 1024;
 
+/**
+ * Maximum canvas pixel count — safe limit for iOS Safari.
+ * iOS limits canvas to ~16.7 million pixels; we use 16MP as a safe cap.
+ */
+export const MAX_CANVAS_PIXELS = 16_777_216;
+
 /** Supported input MIME types */
 export const SUPPORTED_TYPES = [
     'image/jpeg',
@@ -51,3 +60,14 @@ export const SUPPORTED_TYPES = [
     'image/webp',
     'image/gif',
 ];
+
+/** Lossless formats where quality parameter is ignored by canvas.toBlob */
+export const LOSSLESS_TYPES = ['image/png', 'image/bmp', 'image/gif'];
+
+/** MIME type to file extension mapping for special cases */
+export const MIME_EXTENSION_MAP: Record<string, string> = {
+    'image/jpeg': 'jpg',
+    'image/svg+xml': 'svg',
+    'image/x-icon': 'ico',
+    'image/vnd.microsoft.icon': 'ico',
+};
