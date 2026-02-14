@@ -9,7 +9,7 @@
 
 import { Options, SUPPORTED_TYPES, MAX_FILE_SIZE } from './types';
 import { smartCompress } from './compress';
-import { blobToFile, getOutputFileName, fileSizeMB } from './utils';
+import { blobToFile, blobToBase64, getOutputFileName, fileSizeMB } from './utils';
 
 /**
  * Custom error class with miconvert branding.
@@ -53,32 +53,50 @@ function validateInput(file: File): void {
 /**
  * Compress an image file in the browser.
  *
+ * Returns a File by default, or a base64 Data URL string if `outputType: 'base64'`.
+ *
  * @param file - The input image File object
  * @param options - Compression options
- * @returns Compressed File object
+ * @returns Compressed File or base64 string
  *
  * @example
  * ```ts
  * import imageCompression from '@miconvert/browser-image-compression';
  *
- * const options = {
- *   maxSizeMB: 1,
- *   maxWidthOrHeight: 1920,
- * };
+ * // Get compressed File (default)
+ * const compressed = await imageCompression(file, { maxSizeMB: 1 });
  *
- * const compressed = await imageCompression(file, options);
- * console.log(`${file.size} → ${compressed.size}`);
+ * // Get base64 for preview
+ * const base64 = await imageCompression(file, {
+ *   maxSizeMB: 0.5,
+ *   outputType: 'base64',
+ * });
+ * img.src = base64; // Data URL ready to use
  * ```
  */
 async function imageCompression(
     file: File,
+    options: Options & { outputType: 'base64' }
+): Promise<string>;
+async function imageCompression(
+    file: File,
+    options?: Options
+): Promise<File>;
+async function imageCompression(
+    file: File,
     options: Options = {}
-): Promise<File> {
+): Promise<File | string> {
     validateInput(file);
 
     try {
         const blob = await smartCompress(file, options);
 
+        // Base64 output
+        if (options.outputType === 'base64') {
+            return blobToBase64(blob);
+        }
+
+        // File output (default)
         const outputName = getOutputFileName(file.name, options.fileType);
         return blobToFile(blob, outputName);
     } catch (error) {
@@ -95,6 +113,7 @@ async function imageCompression(
 
 // Named exports for advanced usage
 export { imageCompression, Options };
+export { getExifOrientation, applyExifOrientation } from './exif';
 
 // Default export for simple usage
 export default imageCompression;

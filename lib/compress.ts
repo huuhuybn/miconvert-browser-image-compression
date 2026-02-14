@@ -36,13 +36,14 @@ export async function smartCompress(
         maxWidthOrHeight,
         initialQuality = 1.0,
         fileType,
+        exifOrientation = true,
     } = options;
 
     // Determine output MIME type
     const outputType = fileType || file.type || 'image/jpeg';
 
-    // Step 1: Draw to canvas (resize if maxWidthOrHeight set)
-    let { canvas } = await drawImageToCanvas(file, maxWidthOrHeight);
+    // Step 1: Draw to canvas (resize if maxWidthOrHeight set, fix EXIF orientation)
+    let { canvas } = await drawImageToCanvas(file, maxWidthOrHeight, exifOrientation);
 
     // If no maxSizeMB constraint, just compress at initialQuality
     if (!maxSizeMB || maxSizeMB <= 0) {

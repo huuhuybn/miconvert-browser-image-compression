@@ -21,6 +21,12 @@ export interface Options {
 
     /** Progress callback. Receives percentage 0–100. (Phase 3) */
     onProgress?: (progress: number) => void;
+
+    /** Output type: 'file' returns File/Blob, 'base64' returns Data URL string. Default: 'file' */
+    outputType?: 'file' | 'base64';
+
+    /** Whether to auto-fix EXIF orientation (iPhone rotation fix). Default: true */
+    exifOrientation?: boolean;
 }
 
 /** Maximum number of binary search iterations for smart compress */
