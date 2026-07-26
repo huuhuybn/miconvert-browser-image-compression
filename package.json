@@ -32,7 +32,7 @@
     "type": "git",
     "url": "https://github.com/huuhuybn/miconvert-browser-image-compression.git"
   },
-  "homepage": "https://miconvert.com",
+  "homepage": "https://miconvert.com/en/compress-jpg",
   "devDependencies": {
     "@rollup/plugin-typescript": "^12.1.0",
     "happy-dom": "^20.6.1",

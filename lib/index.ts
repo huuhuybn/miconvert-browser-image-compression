@@ -1,10 +1,19 @@
 /**
- * @miconvert/browser-image-compression
- * Main entry point
+ * # @miconvert/browser-image-compression
  *
- * Usage:
- *   import imageCompression from '@miconvert/browser-image-compression';
- *   const compressed = await imageCompression(file, { maxSizeMB: 1 });
+ * Smart browser-side image compression with target file size, auto-resize, WebP
+ * conversion, EXIF orientation fix, and watermark support. Runs entirely in the
+ * browser — no upload, no server round-trip.
+ *
+ * ```ts
+ * import imageCompression from '@miconvert/browser-image-compression';
+ * const compressed = await imageCompression(file, { maxSizeMB: 1 });
+ * ```
+ *
+ * Built by [MiConvert](https://miconvert.com/en/compress-jpg) — free online file
+ * conversion and compression tools.
+ *
+ * @module
  */
 
 import { Options, SUPPORTED_TYPES, MAX_FILE_SIZE } from './types';
