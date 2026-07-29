@@ -190,9 +190,10 @@ async function imageCompression(
 }
 
 // Named exports for advanced usage
-export { imageCompression, terminateWorker, Options };
+export { imageCompression, terminateWorker };
+export type { Options };
 export { getExifOrientation, applyExifOrientation } from './exif';
-export { WatermarkOptions } from './watermark';
+export type { WatermarkOptions } from './watermark';
 
 // Default export for simple usage
 export default imageCompression;
