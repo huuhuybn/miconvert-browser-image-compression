@@ -94,10 +94,10 @@ Chrome 64+, Firefox 62+, Safari 12+, Edge 79+
 
 > **If you encounter any bugs, issues, or need help, please contact us at:**
 >
-> ### 👉 [miconvert.com/en/contact](https://miconvert.com/en/contact)
+> ### 👉 [miconvert.com/en/contact](https://miconvert.com/en/contact?utm_source=npm&utm_medium=readme&utm_campaign=browser-image-compression)
 >
 > We respond to all inquiries within 24 hours. You can also open an issue on [GitHub](https://github.com/huuhuybn/miconvert-browser-image-compression/issues), but for the fastest response, please use our contact page.
 
 ## License
 
-MIT © [Miconvert](https://miconvert.com)
+MIT © [Miconvert](https://miconvert.com?utm_source=npm&utm_medium=readme&utm_campaign=browser-image-compression)

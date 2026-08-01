@@ -10,7 +10,7 @@
  * const compressed = await imageCompression(file, { maxSizeMB: 1 });
  * ```
  *
- * Built by [MiConvert](https://miconvert.com/en/compress-jpg) — free online file
+ * Built by [MiConvert](https://miconvert.com/en/compress-jpg?utm_source=jsr&utm_medium=listing&utm_campaign=browser-image-compression) — free online file
  * conversion and compression tools.
  *
  * @module
